@@ -47,7 +47,7 @@ var spawnSimple = {
 
   /** @param {Spawn} spawn **/
   run: function(spawn) {
-    // var harvestersNeeded = 0;
+    var harvestersNeeded = 3;
     var extensions = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_EXTENSION});
     var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER});
 
@@ -76,7 +76,7 @@ var spawnSimple = {
       spawn.memory.scvLevel = 1;
     }
 
-    if (harvesters.length < 2) {
+    if (harvesters.length < harvestersNeeded) {
       if (spawn.memory.scvLevel == 2)
         spawnScv2(spawn, "harvester");
       else

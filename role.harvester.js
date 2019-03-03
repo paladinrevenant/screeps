@@ -24,9 +24,9 @@ var roleHarvester = {
           creep.moveTo(droppedEnergy[0], {visualizePathStyle: {stroke: '#ffaa00'}});
         }
       } else { // If there is no dropped energy, then move on to harvesting sources
-        var sources = creep.room.find(FIND_SOURCES);
-        if (creep.harvest(sources[0]) == ERR_NOT_IN_RANGE) {
-          creep.moveTo(sources[0], {visualizePathStyle: {stroke: '#ffaa00'}});
+        var targetSource = creep.pos.findClosestByPath(FIND_SOURCES);
+        if (creep.harvest(targetSource) == ERR_NOT_IN_RANGE) {
+          creep.moveTo(targetSource, {visualizePathStyle: {stroke: '#ffaa00'}});
         }
       }
     } else { // If not harvesting
