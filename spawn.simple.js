@@ -58,9 +58,7 @@ var spawnSimple = {
 
 
     // Process all towers
-    var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER });
-    for (var tower in towers)
-      towerDriver.run(tower);
+    _.each(towers, function(value){ towerDriver.run(value); });
 
     if (extensions.length >= 4) {
       spawn.memory.scvLevel = 2;
