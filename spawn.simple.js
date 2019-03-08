@@ -39,108 +39,134 @@ var towerLocations = [
   [5,-11],[11,5],[-5,11],[-11,-5]
 ];
 
-var maxExtensions = [0, 0, 5, 10, 20, 30, 40, 50, 60];
+var maxExtensions = [0, 0, 5, 10, 20, 30, 40, 50, 60]; // Maximum number of extensions based on room level
 
-var maxTowers = [0, 0, 0, 1, 1, 2, 2, 3, 6];
+var maxTowers = [0, 0, 0, 1, 1, 2, 2, 3, 6]; // Maximum number of towers based on room level
 
+/**
+ * The most basic type of spawn
+ *
+ * @type {Object}
+ */
 var spawnSimple = {
 
-  /** @param {Spawn} spawn **/
+  /**
+   * Instructions to be executed every game tick.
+   *
+   * @param  {Spawn} spawn The active spawn object
+   * @return {void}
+   */
   run: function(spawn) {
-    var harvestersNeeded = 3;
-    var extensions = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_EXTENSION});
-    var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER});
+    var harvestersNeeded = 3; // The minimum number of harvesters. If thenumber of harvesters falls below this threshold, more will be spawned.
+    var extensions = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_EXTENSION}); // An array of all extensions in the room
+    var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER}); // An array of all towers in the room
 
-    var harvesters = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "harvester"));
-    var upgraders = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "upgrader"));
-    var builders = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "builder"));
-    // console.log("Harvesters: " + harvesters.length + "\nUpgraders: " + upgraders.length + "\nBuilders: " + builders.length);
-
+    var harvesters = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "harvester")); // An array of all harvesters assigned to this spawn
+    var upgraders = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "upgrader")); // An array of all upgraders assigned to this spawn
+    var builders = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "builder")); // An array of all builders assigned to this spawn
 
     // Process all towers
     _.each(towers, function(value){ towerDriver.run(value); });
 
-    if (extensions.length >= 4) {
-      spawn.memory.scvLevel = 2;
-      if (spawn.room.energyAvailable >= 500) {
-        var tier1scvs = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.type == "scv1"));
-        if (tier1scvs.length > 0) {
-          if (spawn.recycleCreep(tier1scvs[0]) == ERR_NOT_IN_RANGE) {
+    if (extensions.length >= 4) { // If there are 4 or more extensions
+      spawn.memory.scvLevel = 2; // Set level of all SCVs to be created to 2
+      if (spawn.room.energyAvailable >= 500) { // If there is at least 500 energy available
+        var tier1scvs = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.type == "scv1")); // An array of all tier 1 SCVs assigned to this spawn
+        if (tier1scvs.length > 0) { // If there are any tier 1 SCVs assigned to this spawn
+          if (spawn.recycleCreep(tier1scvs[0]) == ERR_NOT_IN_RANGE) { // Recycle only the first SCV in the list. If the creep is out of range, tell it to come back to the spawn.
             tier1scvs[0].memory.task = "return";
           }
         }
       }
-    } else {
-      spawn.memory.scvLevel = 1;
+    } else { // If there are fewer than 4 extensions
+      spawn.memory.scvLevel = 1; // Set the level of all SCVs to be created to 1
     }
 
-    if (harvesters.length < harvestersNeeded) {
+    if (harvesters.length < harvestersNeeded) { // If there are fewer harvesters than the minimum number of harvesters
+      if (spawn.memory.scvLevel == 2) // If the SCV level is 2
+        spawnScv2(spawn, "harvester"); // Spawn a level 2 SCV with a role of harvester
+      else // If the SCV level is not 2
+        spawnScv1(spawn, "harvester"); // Spawn a level 1 SCV with a role of harvester
+    } else if (upgraders.length < 1 && spawn.room.controller.my) { // If there is not an upgrader and the room is mine
       if (spawn.memory.scvLevel == 2)
-        spawnScv2(spawn, "harvester");
-      else
-        spawnScv1(spawn, "harvester");
-    } else if (upgraders.length < 1 && spawn.room.controller.my) {
-      if (spawn.memory.scvLevel == 2)
-        spawnScv2(spawn, "upgrader");
-      else
-        spawnScv1(spawn, "upgrader");
+        spawnScv2(spawn, "upgrader"); // Spawn a level 2 SCV with a role of upgrader
+      else // If the SCV level is not 2
+        spawnScv1(spawn, "upgrader"); // Spawn a level 1 SCV with a role of upgrader
     } else if (builders.length < 1 && spawn.room.controller.my && spawn.room.controller.level > 1) {
       if (spawn.memory.scvLevel == 2)
-        spawnScv2(spawn, "builder");
-      else
-        spawnScv1(spawn, "builder");
+        spawnScv2(spawn, "builder"); // Spawn a level 2 SCV with a role of builder
+      else // If the SCV level is not 2
+        spawnScv1(spawn, "builder"); // Spawn a level 1 SCV with a role of builder
     }
 
-    if (spawn.room.controller.my) {
-      if (extensions.length < maxExtensions[spawn.room.controller.level])
-        manageExtensions(spawn, extensions.length);
-      if (towers.length < maxTowers[spawn.room.controller.level])
-        manageTowers(spawn, towers.length);
+    if (spawn.room.controller.my) { // If the room is controlled by me
+      if (extensions.length < maxExtensions[spawn.room.controller.level]) // If there are fewer extensions than are allowed by the room level
+        manageExtensions(spawn, extensions.length); // Build a new extension
+      if (towers.length < maxTowers[spawn.room.controller.level]) // If there are fewer towers than are allowed by the room level
+        manageTowers(spawn, towers.length); // Build a new tower
     }
 	}
 };
 
+/**
+ * Spawn a tier 1 SCV
+ * @param  {Spawn} spawn   The Spawn object that is creating the new creep
+ * @param  {String} newRole The role that the new SCV will fill
+ * @return {void}
+ */
 var spawnScv1 = function(spawn, newRole) {
-  var newName = 'SCV' + Game.time;
-  // console.log('Spawning new harvester: ' + newName);
-  spawn.spawnCreep([WORK,CARRY,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv1"}});
+  var newName = 'SCV' + Game.time; // Create a new unique name for the SCV
+  spawn.spawnCreep([WORK,CARRY,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv1"}}); // Spawn the new SCV
 };
 
+/**
+ * Spawn a tier 2 SCV
+ * @param  {Spawn} spawn   The Spawn object that is creating the new creep
+ * @param  {String} newRole The role that the new SCV will fill
+ * @return {void}
+ */
 var spawnScv2 = function(spawn, newRole) {
-  var newName = 'SCV' + Game.time;
-  // console.log('Spawning new harvester: ' + newName);
-  spawn.spawnCreep([WORK,WORK,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv2"}});
+  var newName = 'SCV' + Game.time; // Create a new unique name for the SCV
+  spawn.spawnCreep([WORK,WORK,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv2"}}); // Spawn the new SCV
 };
 
+/**
+ * Create new extensions based on the number of extensions that exist and the preferred placement
+ *
+ * @param  {Spawn} spawn             The spawn that is creating the new extension
+ * @param  {int} currentExtensions   The number of extensions that exist currently
+ * @return {void}
+ */
 var manageExtensions = function(spawn, currentExtensions) {
-  var extensionConstructionSites = spawn.room.find(FIND_CONSTRUCTION_SITES, { filter: (site) => site.structureType == STRUCTURE_EXTENSION});
+  var extensionConstructionSites = spawn.room.find(FIND_CONSTRUCTION_SITES, { filter: (site) => site.structureType == STRUCTURE_EXTENSION}); // An array of construction sites that are designated for extensions
 
-  if (extensionConstructionSites.length == 0) {
-    // console.log("Extensions: " + extensions.length);
-    // console.log("Max Extensions: " + maxExtensions[spawn.room.controller.level]);
-    // console.log("Construction Sites: " + extensionConstructionSites.length);
-    for (var a = currentExtensions; a < extensionLocations.length; a++) {
-      // console.log("inside loop");
-      if (spawn.room.createConstructionSite(spawn.pos.x + extensionLocations[a][0], spawn.pos.y + extensionLocations[a][1], STRUCTURE_EXTENSION) == ERR_INVALID_TARGET) {
-        // console.log("continuing");
-        continue;
-      } else {
-        // console.log("breaking");
-        break;
+  if (extensionConstructionSites.length == 0) { // If there are no construction sites for extensions. This has the effect of ensuring that only 1 extension construction site is built at a time
+    for (var a = currentExtensions; a < extensionLocations.length; a++) { // Look through the preferred extension locations starting from the current number of extensions
+      if (spawn.room.createConstructionSite(spawn.pos.x + extensionLocations[a][0], spawn.pos.y + extensionLocations[a][1], STRUCTURE_EXTENSION) == ERR_INVALID_TARGET) { // Attempt to create a new extension construction site in the desired location
+        continue; // If the location is invalid (usually because something is already there) then move on to the next preferred location
+      } else { // If the construction site creation succeeds, or fails for any other reason
+        break; // You're done, no need to search more
       }
     }
   }
 };
 
+/**
+ * Create new towers based on the number of towers that exist and their preferred placement
+ *
+ * @param  {Spawn} spawn         The spawn that is creating the new tower
+ * @param  {int} currentTowers The number of towers that exist currently
+ * @return {void}
+ */
 var manageTowers = function(spawn, currentTowers) {
-  var towerConstructionSites = spawn.room.find(FIND_CONSTRUCTION_SITES, { filter: (site) => site.structureType == STRUCTURE_TOWER});
+  var towerConstructionSites = spawn.room.find(FIND_CONSTRUCTION_SITES, { filter: (site) => site.structureType == STRUCTURE_TOWER}); // An array of construction sites that are designated for towers
 
-  if (towerConstructionSites.length == 0) {
-    for (var a = currentTowers; a < towerLocations.length; a++) {
-      if (spawn.room.createConstructionSite(spawn.pos.x + towerLocations[a][0], spawn.pos.y + towerLocations[a][1], STRUCTURE_TOWER) == ERR_INVALID_TARGET) {
-        continue;
-      } else {
-        break;
+  if (towerConstructionSites.length == 0) { // If there are no tower construction sites. This has the effect of ensuring that only 1 tower construction site is built at a time
+    for (var a = currentTowers; a < towerLocations.length; a++) { // Look through the preferred tower locations starting from the current number of towers
+      if (spawn.room.createConstructionSite(spawn.pos.x + towerLocations[a][0], spawn.pos.y + towerLocations[a][1], STRUCTURE_TOWER) == ERR_INVALID_TARGET) { // Atempt to create a new tower construction site in the desired location
+        continue; // If the location is invalid (usually because something is already there) then move on to the next preferred location
+      } else { // If the construction site creation succeeds, or fails for any other reason
+        break; // You're done, no need to search more
       }
     }
   }
