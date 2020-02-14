@@ -1,4 +1,17 @@
+/**
+ * Spawn Driver
+ * 
+ * This contains code for controlling the spawns.
+ * 
+ * run() - The function that gets called every tick
+ * 
+ * memory:
+ *   cl - Creep List: The list of creeps assigned to this spawn
+ */
 var towerDriver = require("driver.tower");
+var roleBuilder = require("role.builder");
+var roleHarvester = require("role.harvester");
+var roleUpgrader = require("role.upgrader");
 
 /**
  Preferred placement of extensions, relative to Spawn (x,y)
@@ -71,6 +84,11 @@ var spawnDriver = {
    * @return {void}
    */
   run: function(spawn) {
+    if (!spawn.memory.cl) 
+      spawn.memory.cl = [];
+
+    taskCreeps(spawn);
+
     var harvestersNeeded = 3; // The minimum number of harvesters. If thenumber of harvesters falls below this threshold, more will be spawned.
     var extensions = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_EXTENSION}); // An array of all extensions in the room
     var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER}); // An array of all towers in the room
@@ -119,7 +137,12 @@ var spawnDriver = {
       if (towers.length < maxTowers[spawn.room.controller.level]) // If there are fewer towers than are allowed by the room level
         manageTowers(spawn, towers.length); // Build a new tower
     }
-	}
+  },
+
+  adoptCreep(spawn, creepName) {
+    spawn.memory.cl.push(creepName);
+    Memory.creeps[creepName].spawn = spawn.name;
+  }
 };
 
 /**
@@ -131,6 +154,7 @@ var spawnDriver = {
 var spawnScv1 = function(spawn, newRole) {
   var newName = 'SCV' + Game.time; // Create a new unique name for the SCV
   spawn.spawnCreep([WORK,CARRY,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv1"}}); // Spawn the new SCV
+  spawn.memory.cl.push(newName); // Add the new creep's name to the creep list
 };
 
 /**
@@ -142,6 +166,7 @@ var spawnScv1 = function(spawn, newRole) {
 var spawnScv2 = function(spawn, newRole) {
   var newName = 'SCV' + Game.time; // Create a new unique name for the SCV
   spawn.spawnCreep([WORK,WORK,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv2"}}); // Spawn the new SCV
+  spawn.memory.cl.push(newName); // Add the new creep's name to the creep list
 };
 
 /**
@@ -185,5 +210,20 @@ var manageTowers = function(spawn, currentTowers) {
     }
   }
 };
+
+function taskCreeps(spawn) {
+  for (let a = 0, l = spawn.memory.cl.length; a < l; a++) {
+    let creep = Game.creeps[a];
+
+    switch(creep.memory.role) { // Execute instructions based on type
+      case "builder": roleBuilder.run(creep);
+        break;
+      case "harvester": roleHarvester.run(creep);
+        break;
+      case "upgrader": roleUpgrader.run(creep);
+        break;
+    }
+  }
+}
 
 module.exports = spawnDriver;

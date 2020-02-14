@@ -8,11 +8,6 @@
   Do these imports have an impact on performance?
 */
 var spawnDriver = require("driver.spawn");
-var roleBuilder = require("role.builder");
-var roleHarvester = require("role.harvester");
-var roleUpgrader = require("role.upgrader");
-
-
 
 /**
  * Main game loop. Executed once every tick.
@@ -31,19 +26,6 @@ function execEveryTick() {
     var spawn = Game.spawns[name];
       spawnDriver.run(spawn);
   }
-
-  // Assign orders to all creeps
-  for (var name in Game.creeps) { // For each creep
-    var creep = Game.creeps[name];
-    switch(creep.memory.role) { // Execute instructions based on type
-      case "builder": roleBuilder.run(creep);
-        break;
-      case "harvester": roleHarvester.run(creep);
-        break;
-      case "upgrader": roleUpgrader.run(creep);
-        break;
-    }
-  }
 }
 
 function execTick0() {
@@ -54,7 +36,10 @@ function execTick1() {
   clearSpawnMemory();
 }
 
-function execTick2() {}
+function execTick2() {
+  adoptOrphanCreeps();
+}
+
 function execTick3() {}
 function execTick4() {}
 function execTick5() {}
@@ -94,6 +79,15 @@ function clearSpawnMemory() {
  * @return {void}
  */
 var adoptOrphanCreeps = function() { //TODO: Reimplement this
+  for (let name in Game.creeps) {
+    let creep = Game.creeps[name];
+
+    if (!creep.memory.spawn || !Game.spawns[creep.memory.spawn]) {
+      let nearestSpawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
+
+      spawnDriver.adoptCreep(nearestSpawn, creep.name);
+    }
+  }
   //Get a list of creeps that either A) Has no spawn defined, or B) Has a spawn defined that does not esist in the list of valid spawns
   var orphanCreeps = _.filter(Game.creeps, (creep) => (_.isUndefined(creep.memory.spawn) || _.isUndefined(Game.spawns[creep.memory.spawn])));
 
