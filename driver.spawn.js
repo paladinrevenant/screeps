@@ -213,7 +213,7 @@ var manageTowers = function(spawn, currentTowers) {
 
 function taskCreeps(spawn) {
   for (let a = 0, l = spawn.memory.cl.length; a < l; a++) {
-    let creep = Game.creeps[a];
+    let creep = Game.creeps[spawn.memory.cl[a]];
 
     switch(creep.memory.role) { // Execute instructions based on type
       case "builder": roleBuilder.run(creep);
