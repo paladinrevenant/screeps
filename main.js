@@ -88,12 +88,6 @@ var adoptOrphanCreeps = function() { //TODO: Reimplement this
       spawnDriver.adoptCreep(nearestSpawn, creep.name);
     }
   }
-  //Get a list of creeps that either A) Has no spawn defined, or B) Has a spawn defined that does not esist in the list of valid spawns
-  var orphanCreeps = _.filter(Game.creeps, (creep) => (_.isUndefined(creep.memory.spawn) || _.isUndefined(Game.spawns[creep.memory.spawn])));
-
-  if (orphanCreeps.length > 0) { // If there are any orphaned creeps found
-    _.forEach(orphanCreeps, function(creep){creep.memory.spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS).name}); // Find the spawn that is closes to that creep and assign the creep to that spawn
-  }
 };
 
 /**
