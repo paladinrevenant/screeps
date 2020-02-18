@@ -211,6 +211,10 @@ var manageTowers = function(spawn, currentTowers) {
   }
 };
 
+/**
+ * Assign tasks to all of the creeps assigned to this spawn
+ * @param {Spawn} spawn 
+ */
 function taskCreeps(spawn) {
   for (let a = 0, l = spawn.memory.cl.length; a < l; a++) {
     let creep = Game.creeps[spawn.memory.cl[a]];
