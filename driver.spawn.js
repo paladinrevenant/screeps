@@ -7,6 +7,30 @@
  * 
  * memory:
  *   cl - Creep List: The list of creeps assigned to this spawn
+ *   st - Stage: The stage that this spawn is operating in
+ * 
+ * Stages:
+ *   0 - Just starting
+ *   1 - Triggered when the first builder is created. Build spoke roads
+ * 
+ * O       O       O
+ *  O  TEEEOEEET  O
+ *   O  EEEOEEE  O
+ *    O    O    O
+ *  T  OEEEOEEEO  T
+ *  EE EOEEOEEOE EE
+ *  EE EEOEOEOEE EE
+ *  EE EEEOOOEEE EE
+ * OOOOOOOOSOOOOOOOO
+ *  EE EEEOOOEEE EE
+ *  EE EEOEOEOEE EE
+ *  EE EOEEOEEOE EE
+ *  T  OEEEOEEEO  T
+ *    O    O    O
+ *   O  EEEOEEE  O
+ *  O  TEEEOEEET  O
+ * O       O       O
+ * 
  */
 var towerDriver = require("driver.tower");
 var roleBuilder = require("role.builder");
@@ -226,6 +250,31 @@ function taskCreeps(spawn) {
         break;
       case "upgrader": roleUpgrader.run(creep);
         break;
+    }
+  }
+}
+
+function calculateSpawnStage(spawn) {
+  let stage = 0;
+
+  /*
+  If there are at least 5 creeps at the spawn
+  and the spoke roads have not been completed, set stage to 1
+  */
+
+}
+
+function isSpokeRoadsFinished(spawn) {
+  let a;
+  let spawnX = spawn.pos.x;
+  let spawnY = spawn.pos.y;
+  let room = spawn.room;
+
+  //Check NORTH
+  for (a = 1; a < 9; a++) {
+    //check for walls
+    if (room.lookForAt(LOOK_TERRAIN, spawnX, spawnY - a)) {
+      
     }
   }
 }
