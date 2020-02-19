@@ -1,6 +1,9 @@
 /**
  * Main file from which everything else gets called
  *
+ * Memory:
+ *   tc - Tick Count: The counter used for spreading out calculations so things don't all happen together.
+ *   ps - Periodic Spawns: An array of arrays. Each array holds the names of the spawns that will be tended on that tick.
  */
 
 /*
@@ -17,7 +20,7 @@ var spawnDriver = require("driver.spawn");
 module.exports.loop = function () {
   advanceTickCount();
   execEveryTick();
-  tickFunctions[Memory.tickCount]();
+  tickFunctions[Memory.tc]();
 }
 
 function execEveryTick() {
@@ -30,21 +33,38 @@ function execEveryTick() {
 
 function execTick0() {
   clearCreepMemory();
+  assignPeriodicSpawns();
 }
 
 function execTick1() {
   clearSpawnMemory();
+  execPeriodicChecks(1);
 }
 
 function execTick2() {
   adoptOrphanCreeps();
+  execPeriodicChecks(2);
 }
 
-function execTick3() {}
-function execTick4() {}
-function execTick5() {}
-function execTick6() {}
-function execTick7() {}
+function execTick3() {
+  execPeriodicChecks(3);
+}
+
+function execTick4() {
+  execPeriodicChecks(4);
+}
+
+function execTick5() {
+  execPeriodicChecks(5);
+}
+
+function execTick6() {
+  execPeriodicChecks(6);
+}
+
+function execTick7() {
+  execPeriodicChecks(7);
+}
 
 
 /**
@@ -97,12 +117,54 @@ var adoptOrphanCreeps = function() { //TODO: Reimplement this
  * @return {void}
  */
 function advanceTickCount() {
-  if (typeof Memory.tickCount != "number" ||
-      Memory.tickCount < 0 ||
-      Memory.tickCount > 6) {
-    Memory.tickCount = 0;
+  if (typeof Memory.tc != "number" ||
+      Memory.tc < 0 ||
+      Memory.tc > 6) {
+    Memory.tc = 0;
   } else {
-    Memory.tickCount++;
+    Memory.tc++;
+  }
+}
+
+function assignPeriodicSpawns() {
+  let unassignedSpawns = [];
+
+  if (!Memory.ps) {
+    Memory.ps = [[],[],[],[],[],[],[],[]];
+  }
+
+  for (name in Game.spawns) {
+    let found = false;
+
+    for (let a = 0; a < 8; a++) {
+      if (Memory.ps[a].includes(name)) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found)
+      unassignedSpawns.push(name);
+  }
+
+  if (unassignedSpawns.length > 0) {
+    for (let b = 0, l = unassignedSpawns.length; b < l; b++) {
+      let idx = 1;
+      let count = Memory.ps[1].length;
+
+      for (let c = 2; c < 8; c++)
+        if (Memory.ps[c].length < count)
+          idx = c;
+      
+      Memory.ps[idx].push(unassignedSpawns[b]);
+    }
+  }
+}
+
+function execPeriodicChecks(tick) {
+  for (let a = 0; a < Memory.ps[tick].length; a++) {
+    let name = Memory.ps[tick][a];
+    spawnDriver.periodicChecks(Game.spawns[name]);
   }
 }
 

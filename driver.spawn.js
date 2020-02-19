@@ -166,6 +166,11 @@ var spawnDriver = {
   adoptCreep(spawn, creepName) {
     spawn.memory.cl.push(creepName);
     Memory.creeps[creepName].spawn = spawn.name;
+  },
+
+  periodicChecks(spawn) {
+    setSpawnStage(spawn);
+    stageFunctions[spawn.memory.st](spawn);
   }
 };
 
@@ -243,40 +248,235 @@ function taskCreeps(spawn) {
   for (let a = 0, l = spawn.memory.cl.length; a < l; a++) {
     let creep = Game.creeps[spawn.memory.cl[a]];
 
-    switch(creep.memory.role) { // Execute instructions based on type
-      case "builder": roleBuilder.run(creep);
-        break;
-      case "harvester": roleHarvester.run(creep);
-        break;
-      case "upgrader": roleUpgrader.run(creep);
-        break;
+    if (!creep) {
+      spawn.memory.cl.splice(a, 1);
+      l = spawn.memory.cl.length;
+    } else {
+      switch(creep.memory.role) { // Execute instructions based on type
+        case "builder": roleBuilder.run(creep);
+          break;
+        case "harvester": roleHarvester.run(creep);
+          break;
+        case "upgrader": roleUpgrader.run(creep);
+          break;
+      }
     }
   }
 }
 
-function calculateSpawnStage(spawn) {
-  let stage = 0;
-
+function setSpawnStage(spawn) {
   /*
   If there are at least 5 creeps at the spawn
   and the spoke roads have not been completed, set stage to 1
   */
+  if (spawn.memory.cl.length >= 5 && !allSpokeRoadsFinished(spawn)) {
+    spawn.memory.st = 1;
+  }
+  /*
+  If the spoke roads have been finished,
+  but the source roads have not, set the stage to 2
+  */
+  else if (allSpokeRoadsFinished(spawn)) {
+    spawn.memory.st = 2;
+  }
 
+  else {
+    spawn.memory.st = 0;
+  }
 }
 
-function isSpokeRoadsFinished(spawn) {
-  let a;
+/**
+ * During stage 0, don't do anything except build up new creeps
+ */
+function execStage0(spawn) {}
+
+/**
+ * During stage 1, build the spoke roads
+ */
+function execStage1(spawn) {
+  //Build each spoke road one at a time
+  if (!isSpokeRoadFinished(spawn, TOP)) {
+    buildSpokeRoad(spawn, TOP);
+  } else if (!isSpokeRoadFinished(spawn, TOP_LEFT)) {
+    buildSpokeRoad(spawn, TOP_LEFT);
+  } else if (!isSpokeRoadFinished(spawn, LEFT)) {
+    buildSpokeRoad(spawn, LEFT);
+  } else if (!isSpokeRoadFinished(spawn, BOTTOM_LEFT)) {
+    buildSpokeRoad(spawn, BOTTOM_LEFT);
+  } else if (!isSpokeRoadFinished(spawn, BOTTOM)) {
+    buildSpokeRoad(spawn, BOTTOM);
+  } else if (!isSpokeRoadFinished(spawn, BOTTOM_RIGHT)) {
+    buildSpokeRoad(spawn, BOTTOM_RIGHT);
+  } else if (!isSpokeRoadFinished(spawn, RIGHT)) {
+    buildSpokeRoad(spawn, RIGHT);
+  } else if (!isSpokeRoadFinished(spawn, TOP_RIGHT)) {
+    buildSpokeRoad(spawn, TOP_RIGHT);
+  }
+}
+
+function execStage2(spawn) {}
+
+function buildSpokeRoad(spawn, direction) {
   let spawnX = spawn.pos.x;
   let spawnY = spawn.pos.y;
   let room = spawn.room;
 
-  //Check NORTH
-  for (a = 1; a < 9; a++) {
-    //check for walls
-    if (room.lookForAt(LOOK_TERRAIN, spawnX, spawnY - a)) {
+  for (let a = 1; a < 9; a++) {
+    let objects;
+    let wall = false;
+    let road = false;
+    let structure;
+    let constructionSite;
+    let lookX;
+    let lookY;
+
+    switch(direction) {
+      case TOP:
+        lookX = spawnX;
+        lookY = spawnY - a;
+        break;
+      case TOP_RIGHT:
+        lookX = spawnX + a;
+        lookY = spawnY - a;
+        break;
+      case RIGHT:
+        lookX = spawnX + a;
+        lookY = spawnY;
+        break;
+      case BOTTOM_RIGHT:
+        lookX = spawnX + a;
+        lookY = spawnY + a;
+        break;
+      case BOTTOM:
+        lookX = spawnX;
+        lookY = spawnY + a;
+        break;
+      case BOTTOM_LEFT:
+        lookX = spawnX - a;
+        lookY = spawnY + a;
+        break;
+      case LEFT:
+        lookX = spawnX - a;
+        lookY = spawnY;
+        break;
+      case TOP_LEFT:
+        lookX = spawnX - a;
+        lookY = spawnY - a;
+        break;
+    }
+
+    objects = room.lookAt(lookX, lookY);
       
+    for (let b = 0, l = objects.length; b < l; b++) {
+      if (objects[b].type === "terrain" && objects[b].terrain === "wall") {
+        wall = true;
+        break;
+      } else if (objects[b].type === "structure" && objects[b].structure.structureType === STRUCTURE_ROAD) {
+        road = true;
+        break;
+      } else if (objects[b].type === "structure") {
+        structure = objects[b].structure;
+      } else if (objects[b].type === "constructionSite") {
+        constructionSite = objects[b].constructionSite;
+      }
+    }
+
+    if (wall) { // If a wall is found, the road can not go any further this way
+      break;
+    } else if (road || (constructionSite && constructionSite.structureType === STRUCTURE_ROAD)) { // If a road or a construction site for a road is found, then go on to the next space
+      continue;
+    } else if (structure) { // If there is some other structrue there, destroy it
+      structure.destroy();
+    } else if (constructionSite && !constructionSite.structureType === STRUCTURE_ROAD) { // If there is a construction site for something other than a road, remove it
+      constructionSite.remove();
+    }
+
+    room.createConstructionSite(lookX, lookY, STRUCTURE_ROAD);
+  }
+}
+
+var stageFunctions = [
+  execStage0,
+  execStage1,
+  execStage2
+];
+
+function allSpokeRoadsFinished(spawn) {
+  if (!isSpokeRoadFinished(spawn, TOP))
+    return false;
+  if (!isSpokeRoadFinished(spawn, TOP_RIGHT))
+    return false;
+  if (!isSpokeRoadFinished(spawn, RIGHT))
+    return false;
+  if (!isSpokeRoadFinished(spawn, BOTTOM_RIGHT))
+    return false;
+  if (!isSpokeRoadFinished(spawn, BOTTOM))
+    return false;
+  if (!isSpokeRoadFinished(spawn, BOTTOM_LEFT))
+    return false;
+  if (!isSpokeRoadFinished(spawn, LEFT))
+    return false;
+  if (!isSpokeRoadFinished(spawn, TOP_LEFT))
+    return false;
+
+  return true;
+}
+
+function isSpokeRoadFinished(spawn, direction) {
+  let spawnX = spawn.pos.x;
+  let spawnY = spawn.pos.y;
+  let room = spawn.room;
+
+  for (let a = 1; a < 9; a++) {
+    let objects;
+    let wall = false;
+    let road = false;
+
+    switch(direction) {
+      case TOP:
+        objects = room.lookAt(spawnX, spawnY - a);
+        break;
+      case TOP_RIGHT:
+        objects = room.lookAt(spawnX + a, spawnY - a);
+        break;
+      case RIGHT:
+        objects = room.lookAt(spawnX + a, spawnY);
+        break;
+      case BOTTOM_RIGHT:
+        objects = room.lookAt(spawnX + a, spawnY + a);
+        break;
+      case BOTTOM:
+        objects = room.lookAt(spawnX, spawnY + a);
+        break;
+      case BOTTOM_LEFT:
+        objects = room.lookAt(spawnX - a, spawnY + a);
+        break;
+      case LEFT:
+        objects = room.lookAt(spawnX - a, spawnY);
+        break;
+      case TOP_LEFT:
+        objects = room.lookAt(spawnX - a, spawnY - a);
+        break;
+    }
+
+    for (let b = 0, l = objects.length; b < l; b++) {
+      if (objects[b].type === "terrain" && objects[b].terrain === "wall") {
+        wall = true;
+        break;
+      } else if (objects[b].type === "structure" && objects[b].structure.structureType === STRUCTURE_ROAD) {
+        road = true;
+        break;
+      }
+    }
+
+    if (wall) { // If a wall is found, the road can not go any further this way
+      break;
+    } else if (!road) { // If no road is found, then the spoke is not finished
+      return false;
     }
   }
+
+  return true; // This spoke is finished
 }
 
 module.exports = spawnDriver;
