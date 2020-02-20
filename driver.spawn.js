@@ -117,9 +117,9 @@ var spawnDriver = {
     var extensions = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_EXTENSION}); // An array of all extensions in the room
     var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER}); // An array of all towers in the room
 
-    var harvesters = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "harvester")); // An array of all harvesters assigned to this spawn
-    var upgraders = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "upgrader")); // An array of all upgraders assigned to this spawn
-    var builders = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.role == "builder")); // An array of all builders assigned to this spawn
+    var harvesters = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.role == "harvester")); // An array of all harvesters assigned to this spawn
+    var upgraders = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.role == "upgrader")); // An array of all upgraders assigned to this spawn
+    var builders = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.role == "builder")); // An array of all builders assigned to this spawn
 
     // Process all towers
     _.each(towers, function(value){ towerDriver.run(value); });
@@ -127,7 +127,7 @@ var spawnDriver = {
     if (extensions.length >= 4) { // If there are 4 or more extensions
       spawn.memory.scvLevel = 2; // Set level of all SCVs to be created to 2
       if (spawn.room.energyAvailable >= 500) { // If there is at least 500 energy available
-        var tier1scvs = _.filter(Game.creeps, (creep) => (creep.memory.spawn == spawn.name && creep.memory.type == "scv1")); // An array of all tier 1 SCVs assigned to this spawn
+        var tier1scvs = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.type == "scv1")); // An array of all tier 1 SCVs assigned to this spawn
         if (tier1scvs.length > 0) { // If there are any tier 1 SCVs assigned to this spawn
           if (spawn.recycleCreep(tier1scvs[0]) == ERR_NOT_IN_RANGE) { // Recycle only the first SCV in the list. If the creep is out of range, tell it to come back to the spawn.
             tier1scvs[0].memory.task = "return";
@@ -297,25 +297,32 @@ function execStage1(spawn) {
   //Build each spoke road one at a time
   if (!isSpokeRoadFinished(spawn, TOP)) {
     buildSpokeRoad(spawn, TOP);
-  } else if (!isSpokeRoadFinished(spawn, TOP_LEFT)) {
-    buildSpokeRoad(spawn, TOP_LEFT);
-  } else if (!isSpokeRoadFinished(spawn, LEFT)) {
-    buildSpokeRoad(spawn, LEFT);
-  } else if (!isSpokeRoadFinished(spawn, BOTTOM_LEFT)) {
-    buildSpokeRoad(spawn, BOTTOM_LEFT);
-  } else if (!isSpokeRoadFinished(spawn, BOTTOM)) {
-    buildSpokeRoad(spawn, BOTTOM);
-  } else if (!isSpokeRoadFinished(spawn, BOTTOM_RIGHT)) {
-    buildSpokeRoad(spawn, BOTTOM_RIGHT);
-  } else if (!isSpokeRoadFinished(spawn, RIGHT)) {
-    buildSpokeRoad(spawn, RIGHT);
   } else if (!isSpokeRoadFinished(spawn, TOP_RIGHT)) {
     buildSpokeRoad(spawn, TOP_RIGHT);
+  } else if (!isSpokeRoadFinished(spawn, RIGHT)) {
+    buildSpokeRoad(spawn, RIGHT);
+  } else if (!isSpokeRoadFinished(spawn, BOTTOM_RIGHT)) {
+    buildSpokeRoad(spawn, BOTTOM_RIGHT);
+  } else if (!isSpokeRoadFinished(spawn, BOTTOM)) {
+    buildSpokeRoad(spawn, BOTTOM);
+  } else if (!isSpokeRoadFinished(spawn, BOTTOM_LEFT)) {
+    buildSpokeRoad(spawn, BOTTOM_LEFT);
+  } else if (!isSpokeRoadFinished(spawn, LEFT)) {
+    buildSpokeRoad(spawn, LEFT);
+  } else if (!isSpokeRoadFinished(spawn, TOP_LEFT)) {
+    buildSpokeRoad(spawn, TOP_LEFT);
   }
 }
 
 function execStage2(spawn) {}
 
+/**
+ * Builds a spoke road in a given direction.
+ * 
+ * @param {Spawn} spawn The spawn being processed.
+ * @param {number} direction One of the defined direction constants.
+ * @returns {void}
+ */
 function buildSpokeRoad(spawn, direction) {
   let spawnX = spawn.pos.x;
   let spawnY = spawn.pos.y;
@@ -395,12 +402,23 @@ function buildSpokeRoad(spawn, direction) {
   }
 }
 
+/**
+ * An array of functions to be executed at each spawn stage.
+ * Holding them this way allows the correct function to be called simply by
+ * storing the spawn's stage as an integer.
+ */
 var stageFunctions = [
   execStage0,
   execStage1,
   execStage2
 ];
 
+/**
+ * Checks to see if all of the spoke roads have been built
+ * 
+ * @param {Spawn} spawn The spawn being checked
+ * @returns {boolean}
+ */
 function allSpokeRoadsFinished(spawn) {
   if (!isSpokeRoadFinished(spawn, TOP))
     return false;
@@ -422,6 +440,13 @@ function allSpokeRoadsFinished(spawn) {
   return true;
 }
 
+/**
+ * Checks to see if a spoke road has been completed in a specific direction
+ * 
+ * @param {Spawn} spawn The spawn that is being checked
+ * @param {Number} direction One of the defined direction constants
+ * @returns {boolean}
+ */
 function isSpokeRoadFinished(spawn, direction) {
   let spawnX = spawn.pos.x;
   let spawnY = spawn.pos.y;
