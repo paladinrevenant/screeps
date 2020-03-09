@@ -14,35 +14,29 @@
  * @type {Object}
  */
 
-const TASK = {
-  HARVEST: 0,
-  DELIVER: 1,
-  RETURN: 2
-};
+const {
+  SCV_TASK,
+  PATH_STYLE
+} = require("constants");
 
-const ROLE = {
-  HARVESTER: 0,
-  UPGRADER: 1,
-  BUILDER: 2
-};
+function run(creep, spawn) {
+  assignTask(creep);
 
-const SCV_PROTOTYPE = [
-  [WORK, CARRY, MOVE, MOVE], // Cost: 250
-  [WORK, CARRY, MOVE, MOVE, WORK, CARRY, MOVE, MOVE], // Cost: 500
-  [WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE, WORK, CARRY, MOVE] // Cost: 800 - Made to move on roads
-];
-
-const returnPathStyle = {
-  stroke: "#FF0000"
-};
-
-const harvestPathStyle = {
-  stroke: "#00A000"
-};
-
-const deliverPathStyle = {
-  stroke: "#0C86F2"
-};
+  switch(creep.memory.t) {
+    case SCV_TASK.HARVEST:
+      harvest(creep);
+      break;
+    case SCV_TASK.DELIVER:
+      deliver(creep);
+      break;
+    case SCV_TASK.RETURN:
+      returnHome(creep);
+      break;
+    case SCV_TASK.RENEW:
+      renew(creep, spawn);
+      break;
+  }
+}
 
 /**
  * Set a creep's task
@@ -51,28 +45,30 @@ const deliverPathStyle = {
  * @return {void}
  */
 function assignTask(creep, task) {
-  if (creep.ticksToLive < 100 && creep.memory.t !== TASK.RETURN) { // If the creep is close to death
-    creep.memory.t = TASK.RETURN; // Send the creep home so that it can be renewed
-    creep.say("Return")
-  } else if (task && Object.values(TASK).includes(task) && creep.memory.t !== TASK.RETURN) { // If a task is supplied and exists in the object
+  if (creep.ticksToLive < 100 && creep.memory.t !== SCV_TASK.RENEW) { // If the creep is close to death
+    creep.memory.t = SCV_TASK.RENEW; // Send the creep home so that it can be renewed
+    creep.say("Renew");
+  } else if (task && Object.values(TASK).includes(task) && creep.memory.t !== SCV_TASK.RETURN) { // If a task is supplied and exists in the object
     creep.memory.t = task; // Assign the given task to the creep
     creep.say(
-      task === TASK.HARVEST
+      task === SCV_TASK.HARVEST
       ? "Harvest"
-      : task === TASK.DELIVER
+      : task === SCV_TASK.DELIVER
         ? "Deliver"
-        : task === TASK.RETURN
+        : task === SCV_TASK.RETURN
           ? "Return"
-          : "Unknown"
+          : task === SCV_TASK.RENEW
+            ? "Renew"
+            : "Unknown"
       );
   } else if (!creep.memory.t) { // If the creep does not have a task
-    creep.memory.t = TASK.HARVEST; // Set the creep's task to harvest
+    creep.memory.t = SCV_TASK.HARVEST; // Set the creep's task to harvest
     creep.say("Harvest");
-  } else if (creep.memory.t !== TASK.HARVEST && creep.memory.t !== TASK.RETURN && creep.store[RESOURCE_ENERGY] === 0) { // If the creep is not harvesting, not returning, and is empty
-    creep.memory.t = TASK.HARVEST; // Set the creep's task to harvest
+  } else if (creep.memory.t !== SCV_TASK.HARVEST && creep.memory.t !== SCV_TASK.RETURN && creep.store[RESOURCE_ENERGY] === 0) { // If the creep is not harvesting, not returning, and is empty
+    creep.memory.t = SCV_TASK.HARVEST; // Set the creep's task to harvest
     creep.say("Harvest");
-  } else if (creep.memory.t !== TASK.DELIVER && creep.memory.t !== TASK.RETURN && creep.store[RESOURCE_ENERGY] === creep.store.getCapacity(RESOURCE_ENERGY)) { // If the creep is not delivering, not returning, and full
-    creep.memory.t = TASK.DELIVER; // Set the creep's task to deliver
+  } else if (creep.memory.t !== SCV_TASK.DELIVER && creep.memory.t !== SCV_TASK.RETURN && creep.store[RESOURCE_ENERGY] === creep.store.getCapacity(RESOURCE_ENERGY)) { // If the creep is not delivering, not returning, and full
+    creep.memory.t = SCV_TASK.DELIVER; // Set the creep's task to deliver
     creep.say("Deliver");
   }
 }
@@ -84,9 +80,9 @@ function assignTask(creep, task) {
  */
 function returnHome(creep) {
   if (creep.memory.sp)
-    creep.moveTo(Game.spawns[creep.memory.sp], { visualizePathStyle: returnPathStyle });
+    creep.moveTo(Game.spawns[creep.memory.sp], { visualizePathStyle: PATH_STYLE.RETURN });
   else
-    creep.moveTo(creep.room.find(FIND_MY_SPAWNS)[0], { visualizePathStyle: returnPathStyle });
+    creep.moveTo(creep.room.find(FIND_MY_SPAWNS)[0], { visualizePathStyle: PATH_STYLE.RETURN });
 }
 
 /**
@@ -103,7 +99,7 @@ function harvest(creep) {
       let code = creep.harvest(source);
       if (code !== OK) {
         if (code === ERR_NOT_IN_RANGE) {
-          creep.moveTo(source, { visualizePathStyle: harvestPathStyle });
+          creep.moveTo(source, { visualizePathStyle: PATH_STYLE.HARVEST });
         } else if (cose === ERR_NOT_ENOUGH_RESOURCES) {
           // Source is empty, just wait.
         } else if (code === ERR_INVALID_TARGET) {
@@ -123,6 +119,11 @@ function harvest(creep) {
   }
 }
 
+/**
+ * Deliver carried energy to the assigned target.
+ * 
+ * @param {Creep} creep The creep being processed
+ */
 function deliver(creep) {
   if (creep.memory.ta) {
     let target = Game.getObjectById(creep.memory.ta);
@@ -130,7 +131,7 @@ function deliver(creep) {
       let code = creep.transfer(target, RESOURCE_ENERGY);
       if (code !== OK) {
         if (code === ERR_NOT_IN_RANGE) {
-          creep.moveTo(target, { visualizePathStyle: deliverPathStyle });
+          creep.moveTo(target, { visualizePathStyle: PATH_STYLE.DELIVER });
         } else if (code === ERR_INVALID_TARGET) {
           console.log(creep.name + " - Target cannot accept energy");
           //TODO: request new target
@@ -151,9 +152,31 @@ function deliver(creep) {
   }
 }
 
+/**
+ * Return home and ask to be renewed
+ * 
+ * @param {Creep} creep The creep being processed
+ * @param {Spawn} spawn The spawn tasking the creep
+ */
+function renew(creep, spawn) {
+  let code = spawn.renewCreep(creep);
+  if (code !== OK) {
+    if (code === ERR_NOT_IN_RANGE) {
+      returnHome(creep);
+    } else if (code === ERR_NOT_ENOUGH_ENERGY) {
+      console.log(creep.name + " - Spawn does not have enough energy. Waiting.");
+    } else if (code === ERR_BUSY) {
+      console.log(creep.name + " - Spawn busy. Waiting.");
+    } else if (code === ERR_FULL) {
+      console.log(creep.name + " - Renewed.");
+      assignTask(creep, SCV_TASK.HARVEST);
+    } else {
+      console.log(creep.name + " - Attempting to renew produced error code: " + code);
+    }
+  }
+}
+
 module.exports = {
   assignTask: assignTask,
-  TASK: TASK,
-  ROLE: ROLE,
-  SCV_PROTOTYPE: SCV_PROTOTYPE
+  run: run
 };

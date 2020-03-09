@@ -32,67 +32,20 @@
  * O       O       O
  * 
  */
+const SCV = require("creep.scv");
+const {
+  MAX_EXTENSIONS,
+  EXTENSION_LOCATIONS,
+  MAX_TOWERS,
+  TOWER_LOCATIONS,
+  SCV_TASK,
+  SCV_ROLE,
+  SCV_PROTOTYPE
+} = require(constants);
 var towerDriver = require("driver.tower");
 var roleBuilder = require("role.builder");
 var roleHarvester = require("role.harvester");
 var roleUpgrader = require("role.upgrader");
-
-/**
- Preferred placement of extensions, relative to Spawn (x,y)
-*/
-const extensionLocations = [
- [-1,-2],[1,-2],[-2,-1],[2,-1],
- [-2,1],[2,1],[-1,2],[1,2],
- [-1,-3],[1,-3],[-3,-1],[3,-1],
- [-3,1],[3,1],[-1,3],[1,3],
- [-2,-3],[2,-3],[-3,-2],[3,-2],
- [-3,2],[3,2],[-2,3],[2,3],
- [-1,-4],[1,-4],[-4,-1],[4,-1],
- [-4,1],[4,1],[-1,4],[1,4],
- [-2,-4],[2,-4],[-4,-2],[4,-2],
- [-4,2],[4,2],[-2,4],[2,4],
- [-3,-4],[3,-4],[-4,-3],[4,-3],
- [-4,3],[4,3],[-3,-4],[3,4],
- [-1,6],[1,6],[-1,7],[1,7],
- [-2,6],[2,6],[-2,7],[2,7],
- [-3,6],[3,6],[-3,7],[3,7],
- [-6,-1],[-6,1],[-7,-1],[-7,1],
- [-6,-2],[-6,2],[-7,-2],[-7,2],
- [-6,-3],[-6,3],[-7,-3],[-7,3],
- [6,-1],[6,1],[7,-1],[7,1],
- [6,-2],[6,2],[7,-2],[7,2],
- [6,-3],[6,3],[7,-3],[7,3],
- [-1,-6],[1,-6],[-1,-7],[1,-7],
- [-2,-6],[2,-6],[-2,-7],[2,-7],
- [-3,-6],[3,-6],[-3,-7],[3,-7]
-];
-
-/**
- Preferred placement of towers, relative to Spawn (x,y)
- */
-const towerLocations = [
-  [-4,-7],[7,-4],[4,7],[-7,4],
-  [4,-7],[7,4],[-4,7],[-7,-4]
-];
-
-/**
- * Preferred placement of roads around Spawn location, relative to Spawn (x,y)
- */
-const baseRoads = [
-  [-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1],
-  [0,-2],[0,-3],[0,-4],[0,-5],[0,-6],[0,-7],[0,-8],
-  [2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],
-  [0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[0,8],
-  [-2,0],[-3,0],[-4,0],[-5,0],[-6,0],[-7,0],[-8,0],
-  [2,2],[3,3],[4,4],[5,5],[6,6],[7,7],[8,8],
-  [2,-2],[3,-3],[4,-4],[5,-5],[6,-6],[7,-7],[8,-8],
-  [-2,2],[-3,3],[-4,4],[-5,5],[-6,6],[-7,7],[-8,8],
-  [-2,-2],[-3,-3],[-4,-4],[-5,-5],[-6,-6],[-7,-7],[-8,-8]
-];
-
-var maxExtensions = [0, 0, 5, 10, 20, 30, 40, 50, 60]; // Maximum number of extensions based on room level
-
-var maxTowers = [0, 0, 0, 1, 1, 2, 2, 3, 6]; // Maximum number of towers based on room level
 
 /**
  * The most basic type of spawn
@@ -156,9 +109,9 @@ var spawnDriver = {
     }
 
     if (spawn.room.controller.my) { // If the room is controlled by me
-      if (extensions.length < maxExtensions[spawn.room.controller.level]) // If there are fewer extensions than are allowed by the room level
+      if (extensions.length < MAX_EXTENSIONS[spawn.room.controller.level]) // If there are fewer extensions than are allowed by the room level
         manageExtensions(spawn, extensions.length); // Build a new extension
-      if (towers.length < maxTowers[spawn.room.controller.level]) // If there are fewer towers than are allowed by the room level
+      if (towers.length < MAX_TOWERS[spawn.room.controller.level]) // If there are fewer towers than are allowed by the room level
         manageTowers(spawn, towers.length); // Build a new tower
     }
   },
@@ -209,8 +162,8 @@ var manageExtensions = function(spawn, currentExtensions) {
   var extensionConstructionSites = spawn.room.find(FIND_CONSTRUCTION_SITES, { filter: (site) => site.structureType == STRUCTURE_EXTENSION}); // An array of construction sites that are designated for extensions
 
   if (extensionConstructionSites.length == 0) { // If there are no construction sites for extensions. This has the effect of ensuring that only 1 extension construction site is built at a time
-    for (var a = currentExtensions; a < extensionLocations.length; a++) { // Look through the preferred extension locations starting from the current number of extensions
-      if (spawn.room.createConstructionSite(spawn.pos.x + extensionLocations[a][0], spawn.pos.y + extensionLocations[a][1], STRUCTURE_EXTENSION) == ERR_INVALID_TARGET) { // Attempt to create a new extension construction site in the desired location
+    for (var a = currentExtensions; a < EXTENSION_LOCATIONS.length; a++) { // Look through the preferred extension locations starting from the current number of extensions
+      if (spawn.room.createConstructionSite(spawn.pos.x + EXTENSION_LOCATIONS[a][0], spawn.pos.y + EXTENSION_LOCATIONS[a][1], STRUCTURE_EXTENSION) == ERR_INVALID_TARGET) { // Attempt to create a new extension construction site in the desired location
         continue; // If the location is invalid (usually because something is already there) then move on to the next preferred location
       } else { // If the construction site creation succeeds, or fails for any other reason
         break; // You're done, no need to search more
@@ -230,8 +183,8 @@ var manageTowers = function(spawn, currentTowers) {
   var towerConstructionSites = spawn.room.find(FIND_CONSTRUCTION_SITES, { filter: (site) => site.structureType == STRUCTURE_TOWER}); // An array of construction sites that are designated for towers
 
   if (towerConstructionSites.length == 0) { // If there are no tower construction sites. This has the effect of ensuring that only 1 tower construction site is built at a time
-    for (var a = currentTowers; a < towerLocations.length; a++) { // Look through the preferred tower locations starting from the current number of towers
-      if (spawn.room.createConstructionSite(spawn.pos.x + towerLocations[a][0], spawn.pos.y + towerLocations[a][1], STRUCTURE_TOWER) == ERR_INVALID_TARGET) { // Atempt to create a new tower construction site in the desired location
+    for (var a = currentTowers; a < TOWER_LOCATIONS.length; a++) { // Look through the preferred tower locations starting from the current number of towers
+      if (spawn.room.createConstructionSite(spawn.pos.x + TOWER_LOCATIONS[a][0], spawn.pos.y + TOWER_LOCATIONS[a][1], STRUCTURE_TOWER) == ERR_INVALID_TARGET) { // Atempt to create a new tower construction site in the desired location
         continue; // If the location is invalid (usually because something is already there) then move on to the next preferred location
       } else { // If the construction site creation succeeds, or fails for any other reason
         break; // You're done, no need to search more
