@@ -3,7 +3,8 @@ module.exports = {
 		HARVEST: 0,
 		DELIVER: 1,
 		RETURN: 2,
-		RENEW: 3
+		RENEW: 3,
+		RECYCLE: 4,
 	},
 	SCV_ROLE: {
 		HARVESTER: 0,

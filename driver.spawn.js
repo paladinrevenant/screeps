@@ -8,6 +8,7 @@
  * memory:
  *   cl - Creep List: The list of creeps assigned to this spawn
  *   st - Stage: The stage that this spawn is operating in
+ *   sl = SCV Level: The level that new SCVs should be spawned as
  * 
  * Stages:
  *   0 - Just starting
@@ -32,7 +33,8 @@
  * O       O       O
  * 
  */
-const SCV = require("creep.scv");
+const Scv = require("creep.scv");
+const Tower = require("driver.tower");
 const {
   MAX_EXTENSIONS,
   EXTENSION_LOCATIONS,
@@ -42,10 +44,17 @@ const {
   SCV_ROLE,
   SCV_PROTOTYPE
 } = require(constants);
+
+
 var towerDriver = require("driver.tower");
 var roleBuilder = require("role.builder");
 var roleHarvester = require("role.harvester");
 var roleUpgrader = require("role.upgrader");
+
+
+const MIN_HARVESTERS = 3; // If the number of harvesters falls below this threshold, more will be spawned.
+const MIN_UPGRADERS = 1; // If the number of upgraders falls below this threshold, more will be spawned.
+const MAX_SCVS = 10;
 
 /**
  * The most basic type of spawn
@@ -63,16 +72,14 @@ var spawnDriver = {
   run: function(spawn) {
     if (!spawn.memory.cl) 
       spawn.memory.cl = [];
+    if (typeof spawn.memory.sl != "number")
+      spawn.memory.sl = 0;
 
     taskCreeps(spawn);
+    spawnCreeps(spawn);
 
-    var harvestersNeeded = 3; // The minimum number of harvesters. If thenumber of harvesters falls below this threshold, more will be spawned.
     var extensions = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_EXTENSION}); // An array of all extensions in the room
     var towers = spawn.room.find(FIND_STRUCTURES, { filter: (structure) => structure.structureType == STRUCTURE_TOWER}); // An array of all towers in the room
-
-    var harvesters = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.role == "harvester")); // An array of all harvesters assigned to this spawn
-    var upgraders = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.role == "upgrader")); // An array of all upgraders assigned to this spawn
-    var builders = _.filter(Game.creeps, (creep) => (creep.memory.sp == spawn.name && creep.memory.role == "builder")); // An array of all builders assigned to this spawn
 
     // Process all towers
     _.each(towers, function(value){ towerDriver.run(value); });
@@ -91,22 +98,6 @@ var spawnDriver = {
       spawn.memory.scvLevel = 1; // Set the level of all SCVs to be created to 1
     }
 
-    if (harvesters.length < harvestersNeeded) { // If there are fewer harvesters than the minimum number of harvesters
-      if (spawn.memory.scvLevel == 2) // If the SCV level is 2
-        spawnScv2(spawn, "harvester"); // Spawn a level 2 SCV with a role of harvester
-      else // If the SCV level is not 2
-        spawnScv1(spawn, "harvester"); // Spawn a level 1 SCV with a role of harvester
-    } else if (upgraders.length < 1 && spawn.room.controller.my) { // If there is not an upgrader and the room is mine
-      if (spawn.memory.scvLevel == 2)
-        spawnScv2(spawn, "upgrader"); // Spawn a level 2 SCV with a role of upgrader
-      else // If the SCV level is not 2
-        spawnScv1(spawn, "upgrader"); // Spawn a level 1 SCV with a role of upgrader
-    } else if (builders.length < 1 && spawn.room.controller.my && spawn.room.controller.level > 1) {
-      if (spawn.memory.scvLevel == 2)
-        spawnScv2(spawn, "builder"); // Spawn a level 2 SCV with a role of builder
-      else // If the SCV level is not 2
-        spawnScv1(spawn, "builder"); // Spawn a level 1 SCV with a role of builder
-    }
 
     if (spawn.room.controller.my) { // If the room is controlled by me
       if (extensions.length < MAX_EXTENSIONS[spawn.room.controller.level]) // If there are fewer extensions than are allowed by the room level
@@ -123,32 +114,57 @@ var spawnDriver = {
 
   periodicChecks(spawn) {
     setSpawnStage(spawn);
+    setScvLevel(spawn);
     stageFunctions[spawn.memory.st](spawn);
   }
 };
 
-/**
- * Spawn a tier 1 SCV
- * @param  {Spawn} spawn   The Spawn object that is creating the new creep
- * @param  {String} newRole The role that the new SCV will fill
- * @return {void}
- */
-var spawnScv1 = function(spawn, newRole) {
-  var newName = 'SCV' + Game.time; // Create a new unique name for the SCV
-  spawn.spawnCreep([WORK,CARRY,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv1"}}); // Spawn the new SCV
-  spawn.memory.cl.push(newName); // Add the new creep's name to the creep list
-};
+function spawnCreeps(spawn) {
+  const creepList = spawn.memory.cl;
+
+  let harvesterCount = 0;
+  let upgraderCount = 0;
+  let builderCount = 0;
+
+  for (let a = 0, l = creepList.length; a < l; a++) {
+    let role = Game.creeps[creepList[a]].memory.r;
+
+    switch(role) {
+      case SCV_ROLE.HARVESTER:
+        harvesterCount++;
+        break;
+      case SCV_ROLE.UPGRADER:
+        upgraderCount++;
+        break;
+      case SCV_ROLE.BUILDER:
+        builderCount++;
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (harvesterCount < MIN_HARVESTERS) {
+    spawnScv(spawn, SCV_ROLE.HARVESTER);
+  } else if (upgraderCount < MIN_UPGRADERS) {
+    spawnScv(spawn, SCV_ROLE.UPGRADER);
+  } else if (harvesterCount + upgraderCount + builderCount < MAX_SCVS) {
+    spawnScv(spawn, SCV_ROLE.BUILDER);
+  }
+}
 
 /**
- * Spawn a tier 2 SCV
- * @param  {Spawn} spawn   The Spawn object that is creating the new creep
- * @param  {String} newRole The role that the new SCV will fill
+ * Spawn a new SCV
+ * @param  {Spawn} spawn The Spawn object that is creating the new creep
+ * @param  {number} role The role that the new SCV will fill
  * @return {void}
  */
-var spawnScv2 = function(spawn, newRole) {
-  var newName = 'SCV' + Game.time; // Create a new unique name for the SCV
-  spawn.spawnCreep([WORK,WORK,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE], newName, {memory: {role: newRole, spawn: spawn.name, type:"scv2"}}); // Spawn the new SCV
-  spawn.memory.cl.push(newName); // Add the new creep's name to the creep list
+var spawnScv = function(spawn, role) {
+  const name = 'SCV' + Game.time; // Create a new unique name for the SCV
+  const level = spawn.memory.sl;
+
+  spawn.spawnCreep(SCV_PROTOTYPE[level], name, {memory: {r: role, sp: spawn.name, l: level}}); // Spawn the new SCV
+  spawn.memory.cl.push(name); // Add the new creep's name to the creep list
 };
 
 /**
@@ -455,6 +471,23 @@ function isSpokeRoadFinished(spawn, direction) {
   }
 
   return true; // This spoke is finished
+}
+
+/**
+ * Set the level that new SCVs should be spawned at.
+ * 
+ * @param {Spawn} spawn The spawn being processed
+ */
+function setScvLevel(spawn) {
+  let level = 0;
+
+  // TODO: Add code to handle level 2 SCVs
+  if (spawn.room.energyCapacityAvailable >= 500) {
+    // If there is enough energy capacity in the room to build level 1 SCVs
+    level = 1;
+  }
+
+  spawn.memory.sl = level;
 }
 
 module.exports = spawnDriver;

@@ -6,6 +6,7 @@
  * Memory:
  *   t  - Task: The task that the creep is supposed to carry out.
  *   r  - Role: The role assigned to the creep.
+ *   l  - Level: The level that the SCV was spawned at.
  *   sp - Spawn: The spawn that the creep is assigned to.
  *   so - Source: The source that the creep is assigned to gather from.
  *   ta - Target: The id of the target that the creep will delver energy to.
@@ -35,6 +36,11 @@ function run(creep, spawn) {
     case SCV_TASK.RENEW:
       renew(creep, spawn);
       break;
+    case SCV_TASK.RECYCLE:
+      recycle(creep, spawn);
+      break;
+    default:
+      break;
   }
 }
 
@@ -59,8 +65,10 @@ function assignTask(creep, task) {
           ? "Return"
           : task === SCV_TASK.RENEW
             ? "Renew"
-            : "Unknown"
-      );
+            : task === SCV_TASK.RECYCLE
+              ? "Recycle"
+              : "Unknown"
+    );
   } else if (!creep.memory.t) { // If the creep does not have a task
     creep.memory.t = SCV_TASK.HARVEST; // Set the creep's task to harvest
     creep.say("Harvest");
@@ -159,7 +167,7 @@ function deliver(creep) {
  * @param {Spawn} spawn The spawn tasking the creep
  */
 function renew(creep, spawn) {
-  let code = spawn.renewCreep(creep);
+  const code = spawn.renewCreep(creep);
   if (code !== OK) {
     if (code === ERR_NOT_IN_RANGE) {
       returnHome(creep);
@@ -172,6 +180,23 @@ function renew(creep, spawn) {
       assignTask(creep, SCV_TASK.HARVEST);
     } else {
       console.log(creep.name + " - Attempting to renew produced error code: " + code);
+    }
+  }
+}
+
+/**
+ * Return home and be recycled for energy
+ * 
+ * @param {Creep} creep The creep being processed
+ * @param {Spawn} spawn The spawn tasking the creep
+ */
+function recycle(creep, spawn) {
+  const code = spawn.recycleCreep(creep);
+  if (code !== OK) {
+    if (code === ERR_NOT_IN_RANGE) {
+      returnHome(creep);
+    } else {
+      console.log(creep.name + " - Attempting to be recycled produced error code: " + code);
     }
   }
 }
